@@ -17,6 +17,7 @@ lablog helps researchers track experiments, code changes, and todos across multi
 - 📊 **Intelligent recaps**: Adaptive detail level based on task state
 - 🌐 **Cross-project**: Works across multiple repos
 - 💾 **Private storage**: Logs stored in `~/.config/lablog/`, not in git
+- 🔍 **Job deduplication**: Prevents analyzing the same output file multiple times when jobs are re-run
 
 ## Installation
 
