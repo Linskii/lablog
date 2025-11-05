@@ -11,13 +11,12 @@ lablog helps researchers track experiments, code changes, and todos across multi
 ## Features
 
 - 📝 **Experiment logging**: Track what you're running and why
-- 🎯 **Smart todos**: Context-aware task tracking
-- 🤖 **AI-powered analysis**: Use Claude to summarize scripts, analyze changes, and enhance recaps
-- 🔄 **Auto-logging**: Shell wrappers for automatic logging of sbatch, git commits, etc.
-- 📊 **Intelligent recaps**: Adaptive detail level based on task state
+- 🎯 **Smart todos**: Context-aware task tracking with priority support
+- 🤖 **AI-powered analysis**: Automatic Claude enhancement of notes, todos, and recaps
+- 🔄 **Seamless integration**: Automatically tracks SLURM jobs (sbatch) and git commits
+- 📊 **Intelligent recaps**: AI-enhanced summaries of your recent work
 - 🌐 **Cross-project**: Works across multiple repos
 - 💾 **Private storage**: Logs stored in `~/.config/lablog/`, not in git
-- 🔍 **Job deduplication**: Prevents analyzing the same output file multiple times when jobs are re-run
 
 ## Installation
 
@@ -35,91 +34,110 @@ pip install -e .
 
 ## Quick Start
 
+### Initial Setup
+
 ```bash
-# Initialize in your project
 lablog init
+```
 
-# Log an experiment (basic)
-lablog log "Testing new architecture on 50k samples" sbatch jobs/train.sh
+This interactive setup will:
+- Detect if Claude Code is available and configure AI features
+- Set up shell hooks for automatic logging of sbatch and git commits
+- Configure your preferences
 
-# Log with AI-powered script analysis (requires Claude Code)
-lablog log "Running baseline model" sbatch jobs/train.sh --ai-summary
+### Seamless Workflow
 
-# Add todos
-lablog todo "Check if preprocessing matches the paper"
-lablog todo "Fix memory leak in data loader" --priority high
+Once set up with hooks, lablog tracks everything automatically:
 
-# Add notes
+```bash
+# Jobs are logged automatically
+sbatch jobs/train.sh
+
+# Git commits are logged automatically with AI analysis
+git commit -m "Fix memory leak in data loader"
+
+# Check what you've been working on
+lablog recap
+```
+
+### Manual Logging
+
+You can also log things explicitly:
+
+```bash
+# Add a quick note
 lablog note "Baseline achieved 0.85 AUROC"
 
-# Get a recap of recent work
-lablog recap
+# Add a todo (optionally with priority)
+lablog todo "Check preprocessing against paper"
+lablog todo "Fix critical bug in training loop" --priority high
 
-# AI-enhanced recap with insights (requires Claude Code)
-lablog recap --enhanced
+# Interactive todo management
+lablog todo -l
+```
+
+### Bypass AI Enhancement
+
+Use the `-r` flag to skip AI enhancement when you want raw, unprocessed entries:
+
+```bash
+lablog note "Quick observation" -r
+lablog todo "Fast task" -r
 ```
 
 ## Usage
 
-### Basic Logging
-
-```bash
-# Log a note
-lablog log "Discovered interesting pattern in embeddings"
-
-# Log with command execution
-lablog log "Training baseline" sbatch jobs/train.sh
-
-# Log with AI summary of the script (uses Claude Code)
-lablog log "Running ablation study" sbatch jobs/ablation.sh --ai-summary
-```
-
-### AI-Powered Features (Requires Claude Code)
-
-```bash
-# Summarize any script with Claude
-lablog summarize jobs/train.sh
-lablog summarize clique_prediction/models/main.py
-
-# Analyze your uncommitted git changes
-lablog analyze-diff
-
-# Get AI-enhanced recap with insights
-lablog recap --enhanced
-lablog recap --enhanced --days 14
-```
-
-### Todos
-
-```bash
-lablog todo "Implement attention mechanism"
-lablog todo "Fix memory leak in data loader" --priority high
-```
-
 ### Recap
+
+View your recent activity with AI-enhanced insights:
 
 ```bash
 lablog recap              # Last 7 days
 lablog recap --days 30    # Last 30 days
 lablog recap --todos-only # Just show active todos
-lablog recap --enhanced   # AI insights (requires Claude Code)
 ```
 
-### Auto-Logging with Shell Wrappers
+If Claude Code is enabled, recaps automatically include:
+- AI summary of what you were working on
+- Analysis of code changes and experiments
+- Job status with output file checking
+- Outstanding todos
 
-Generate shell functions that automatically log when you run commands:
+### Todo Management
 
 ```bash
-# Generate wrappers
-lablog generate-wrappers --shell bash --output ~/.lablog_wrappers.sh
+# Add todos
+lablog todo "Implement attention mechanism"
+lablog todo "Fix memory leak" --priority high
 
-# Add to your ~/.bashrc
-echo "source ~/.lablog_wrappers.sh" >> ~/.bashrc
-source ~/.bashrc
+# Interactive management (arrow keys + space to toggle)
+lablog todo -l
+```
 
-# Now sbatch and git commits are automatically logged!
-sbatch jobs/train.sh  # Automatically logged with AI summary
-git commit -m "Fix bug"  # Automatically logged
+### Archive Management
+
+Keep your logs clean by archiving old entries:
+
+```bash
+# Merge old entries into a summary
+lablog merge --from-date 2025-10-01 --to-date 2025-10-31
+
+# Archive entries by date or type
+lablog clear
+lablog clear --completed-todos-only
+
+# Permanently delete old archives
+lablog delete-archive --before-date 2025-09-01
+```
+
+### Multi-Project Support
+
+```bash
+# List all tracked projects
+lablog projects
+
+# View activity across all projects
+lablog recap --all-projects
 ```
 
 ## Storage
@@ -130,79 +148,35 @@ Logs are stored in `~/.config/lablog/` by default, keeping them private and acce
 
 ```
 ~/.config/lablog/
-├── global.jsonl          # Cross-project entries
+├── config.json          # User preferences
 └── projects/
     └── <project-hash>/
         ├── metadata.json # Project info
-        └── log.jsonl    # Project entries (JSONL format)
+        ├── log.jsonl     # Notes and todos
+        ├── jobs.jsonl    # SLURM job entries
+        └── archive.jsonl # Archived entries
 ```
 
 ## Claude Code Integration
 
-lablog integrates with [Claude Code](https://claude.com/claude-code) for AI-powered features. These features use Claude Code's headless mode, which means:
+lablog uses [Claude Code](https://claude.com/claude-code) for AI-powered features:
 
 - ✅ Uses your existing Claude Code subscription
 - ✅ No additional API costs
 - ✅ Works from the command line
-- ✅ Fully automated - no manual Claude interaction needed
+- ✅ Fully automated
 
-### Requirements
+### AI Features
 
-To use AI-powered features:
+When Claude Code is enabled (via `lablog init`):
 
-1. Install [Claude Code](https://docs.claude.com/en/docs/claude-code/overview.md)
-2. Make sure the `claude` command is in your PATH
-3. Use flags like `--ai-summary` or `--enhanced` on lablog commands
+- **Auto-enhancement**: Notes and todos are automatically clarified and formatted
+- **Script analysis**: Job submissions are analyzed for key parameters and configuration
+- **Diff analysis**: Git commits are automatically summarized
+- **Smart recaps**: Get AI-generated summaries of your recent work
+- **Job output analysis**: Automatically check if jobs succeeded or failed
 
-If Claude Code is not installed, lablog still works perfectly - you just won't have AI analysis features.
-
-### How It Works
-
-When you run a command like `lablog summarize jobs/train.sh`, lablog:
-
-1. Invokes Claude Code in headless mode: `claude -p "Your prompt"`
-2. Gets the response automatically
-3. Stores it in your log or displays it
-
-No manual interaction required!
-
-## Example Workflow
-
-Here's a typical research workflow with lablog:
-
-```bash
-# Morning: Start working on a project
-cd ~/my-research-project
-lablog recap --enhanced  # Get AI summary of what you were doing
-
-# Run an experiment with auto-logging
-lablog log "Testing dropout=0.3" sbatch jobs/train.sh --ai-summary
-
-# Made some code changes?
-lablog analyze-diff  # Claude summarizes your changes
-
-# End of day: Add a todo for tomorrow
-lablog todo "Try learning rate warmup" --priority high
-
-# Switch to another project
-cd ~/protein-project
-lablog recap  # Instantly see what you were doing here
-```
-
-## Tips for Researchers
-
-1. **Use AI summaries sparingly**: The `--ai-summary` flag calls Claude, so use it for important experiments where you want detailed documentation
-
-2. **Set up shell wrappers**: If you frequently use `sbatch`, auto-logging saves time:
-   ```bash
-   lablog generate-wrappers --shell bash --commands sbatch --output ~/.lablog_wrappers.sh
-   ```
-
-3. **Review regularly**: Run `lablog recap --enhanced` weekly to get AI insights on your progress
-
-4. **Cross-project visibility**: Use `lablog recap --all-projects` to see all your work
-
-5. **Export for papers**: The JSONL format is easy to parse for generating method sections
+If Claude Code is not installed, lablog works perfectly - you just won't have AI features.
 
 ## License
 
