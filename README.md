@@ -1,4 +1,6 @@
-# lablog
+# lablog 🐶
+
+Your loyal lab companion - automatically tracking your research workflow so you never lose context.
 
 Research workflow memory system - never lose context when switching between projects.
 
