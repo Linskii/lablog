@@ -22,6 +22,13 @@ lablog helps researchers track experiments, code changes, and todos across multi
 ## Installation
 
 ```bash
+pip install lablog
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/Linskii/lablog.git
 cd lablog
 pip install -e .
 ```
