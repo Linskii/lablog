@@ -552,32 +552,37 @@ def init():
             commands.append("git")
 
         if commands:
-            # Generate wrappers
+            # Generate wrappers for detected shell
             wrapper_content = _generate_wrapper_content(commands, shell)
             wrapper_file = Path.home() / f".lablog_wrappers.{shell}"
             wrapper_file.write_text(wrapper_content)
 
-            # Determine rc file
-            rc_file = Path.home() / f".{shell}rc"
+            # Check both .bashrc and .zshrc (user might have both)
+            bashrc = Path.home() / ".bashrc"
+            zshrc = Path.home() / ".zshrc"
+            rc_files = [f for f in [bashrc, zshrc] if f.exists()]
 
             console.print(f"\n[green]✓[/green] Wrappers written to: {wrapper_file}")
-            console.print(f"\n[bold]To activate hooks, add this line to your {rc_file}:[/bold]")
-            console.print(f"[cyan]  source {wrapper_file}[/cyan]\n")
 
-            auto_add = click.confirm(f"Automatically add to {rc_file}?", default=False)
-            if auto_add:
-                # Check if already sourced
-                if rc_file.exists():
-                    rc_content = rc_file.read_text()
-                    if str(wrapper_file) not in rc_content:
-                        with open(rc_file, "a") as f:
-                            f.write(f"\n# lablog shell hooks\nsource {wrapper_file}\n")
-                        console.print(f"[green]✓[/green] Added to {rc_file}")
-                        console.print("[yellow]⚠[/yellow] Run [cyan]source {rc_file}[/cyan] or restart your shell to activate")
-                    else:
-                        console.print("[dim]Already in {rc_file}[/dim]")
-                else:
-                    console.print(f"[yellow]⚠[/yellow] {rc_file} not found, please add manually")
+            if not rc_files:
+                console.print(f"\n[yellow]⚠[/yellow] No .bashrc or .zshrc found, please add manually")
+                console.print(f"[cyan]  source {wrapper_file}[/cyan]")
+            else:
+                console.print(f"\n[bold]Found {len(rc_files)} shell rc file(s). To activate hooks:[/bold]")
+                console.print(f"[cyan]  source {wrapper_file}[/cyan]\n")
+
+                auto_add = click.confirm(f"Automatically add to shell rc file(s)?", default=False)
+                if auto_add:
+                    for rc_file in rc_files:
+                        rc_content = rc_file.read_text()
+                        if str(wrapper_file) not in rc_content:
+                            with open(rc_file, "a") as f:
+                                f.write(f"\n# lablog shell hooks\nsource {wrapper_file}\n")
+                            console.print(f"[green]✓[/green] Added to {rc_file.name}")
+                        else:
+                            console.print(f"[dim]Already in {rc_file.name}[/dim]")
+
+                    console.print(f"\n[yellow]⚠[/yellow] Run [cyan]source ~/.bashrc[/cyan] or [cyan]source ~/.zshrc[/cyan] or restart your shell to activate")
 
             config.enable_hooks()
         else:
@@ -941,10 +946,10 @@ def _generate_wrapper_content(commands: list, shell: str) -> str:
     command {cmd} "$@"
     local exit_code=$?
 
-    # If successful, log with lablog (will use AI summary if Claude enabled)
+    # If successful, log with lablog in background (will use AI summary if Claude enabled)
     if [ $exit_code -eq 0 ]; then
-        # Use 'command' to find lablog in PATH dynamically, avoiding bash command hashing issues
-        command lablog log --no-execute {cmd} "$@" 2>/dev/null || echo "[lablog] Warning: lablog not found in PATH" >&2
+        # Run in background with output logged to ~/.config/lablog/background.log
+        (command lablog log --no-execute {cmd} "$@" >> ~/.config/lablog/background.log 2>&1 &)
     fi
 
     return $exit_code
