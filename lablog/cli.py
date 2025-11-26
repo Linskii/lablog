@@ -71,7 +71,8 @@ def cli(ctx, version):
 @click.argument("command", nargs=-1)
 @click.option("--type", "entry_type", default="note", help="Entry type (note, experiment, todo)")
 @click.option("--priority", default="normal", help="Priority (low, normal, high)")
-def log(description: Optional[str], command: tuple, entry_type: str, priority: str):
+@click.option("--no-execute", is_flag=True, help="Log the command without executing it")
+def log(description: Optional[str], command: tuple, entry_type: str, priority: str, no_execute: bool):
     """Log an entry with optional command execution.
 
     Examples:
@@ -146,37 +147,38 @@ def log(description: Optional[str], command: tuple, entry_type: str, priority: s
                         entry["context"] = {}
                     entry["context"]["ai_summary"] = ai_analysis
 
-        # Execute command
-        console.print(f"[blue]Executing:[/blue] {command_str}")
-        try:
-            result = subprocess.run(
-                command,
-                cwd=detector.working_dir,
-                capture_output=True,
-                text=True
-            )
+        # Execute command (unless --no-execute is set)
+        if not no_execute:
+            console.print(f"[blue]Executing:[/blue] {command_str}")
+            try:
+                result = subprocess.run(
+                    command,
+                    cwd=detector.working_dir,
+                    capture_output=True,
+                    text=True
+                )
 
-            # Store command output/result
-            entry["command_result"] = {
-                "returncode": result.returncode,
-                "stdout": result.stdout[:500] if result.stdout else "",  # Truncate
-                "stderr": result.stderr[:500] if result.stderr else "",
-            }
+                # Store command output/result
+                entry["command_result"] = {
+                    "returncode": result.returncode,
+                    "stdout": result.stdout[:500] if result.stdout else "",  # Truncate
+                    "stderr": result.stderr[:500] if result.stderr else "",
+                }
 
-            # Print output
-            if result.stdout:
-                console.print(result.stdout, end="")
-            if result.stderr:
-                console.print(f"[red]{result.stderr}[/red]", end="")
+                # Print output
+                if result.stdout:
+                    console.print(result.stdout, end="")
+                if result.stderr:
+                    console.print(f"[red]{result.stderr}[/red]", end="")
 
-            if result.returncode != 0:
-                console.print(f"[red]Command failed with exit code {result.returncode}[/red]")
+                if result.returncode != 0:
+                    console.print(f"[red]Command failed with exit code {result.returncode}[/red]")
+                    command_succeeded = False
+
+            except Exception as e:
+                console.print(f"[red]Error executing command: {e}[/red]")
+                entry["command_error"] = str(e)
                 command_succeeded = False
-
-        except Exception as e:
-            console.print(f"[red]Error executing command: {e}[/red]")
-            entry["command_error"] = str(e)
-            command_succeeded = False
 
     # Only save entry if command succeeded (or no command was run)
     if not command_succeeded:
@@ -935,11 +937,17 @@ def _generate_wrapper_content(commands: list, shell: str) -> str:
             wrapper = f"""
 # lablog auto-logging wrapper for sbatch
 {cmd}() {{
-    # Log with lablog (will use AI summary if Claude enabled, or script name as fallback)
-    lablog log {cmd} "$@"
-
-    # Execute actual command
+    # Execute actual command first and capture output
     command {cmd} "$@"
+    local exit_code=$?
+
+    # If successful, log with lablog (will use AI summary if Claude enabled)
+    if [ $exit_code -eq 0 ]; then
+        # Use 'command' to find lablog in PATH dynamically, avoiding bash command hashing issues
+        command lablog log --no-execute {cmd} "$@" 2>/dev/null || echo "[lablog] Warning: lablog not found in PATH" >&2
+    fi
+
+    return $exit_code
 }}
 """
         elif cmd == "git":
@@ -954,8 +962,8 @@ git() {{
         if [ $? -eq 0 ]; then
             local commit_msg=$(command git log -1 --pretty=%B)
             # Analyze the commit using lablog
-            lablog analyze-diff > /dev/null 2>&1 || true
-            lablog note "Git commit: $commit_msg"
+            command lablog analyze-diff > /dev/null 2>&1 || true
+            command lablog note "Git commit: $commit_msg" 2>/dev/null || true
         fi
     else
         # Pass through for other git commands
@@ -967,7 +975,7 @@ git() {{
             wrapper = f"""
 # lablog auto-logging wrapper for {cmd}
 {cmd}() {{
-    lablog log "Executed {cmd}: $*"
+    command lablog log "Executed {cmd}: $*" 2>/dev/null || true
     command {cmd} "$@"
 }}
 """
